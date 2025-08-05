@@ -1,3 +1,14 @@
+window.Pi.authenticate(["username", "payments"],
+  function(user) {
+    console.log("✅ Pi user authenticated:", user.username);
+    // You can store user.username for reference
+  },
+  function(error) {
+    console.error("❌ Pi authentication failed:", error);
+  }
+);
+
+
 
 // Copyright 2012 Shaun Williams
 //
@@ -174,7 +185,7 @@ var turboMode = false;
 var gameMode = GAME_PACMAN;
 var getGameName = (function(){
 
-    var names = ["PAC-MAN", "MS PAC-MAN", "COOKIE-MAN","CRAZY OTTO"];
+    var names = ["PLAY"];
     
     return function(mode) {
         if (mode == undefined) {
@@ -4687,10 +4698,6 @@ var inGameMenu = (function() {
         confirmMenu.onConfirm();
     });
     confirmMenu.addTextButton("NO", function() {
-        confirmMenu.disable();
-        showMainMenu();
-    });
-    confirmMenu.addTextButton("CANCEL", function() {
         confirmMenu.disable();
         showMainMenu();
     });
@@ -9585,12 +9592,20 @@ var fadeNextState = function (prevState, nextState, frameDuration, continueUpdat
 
 var homeState = (function(){
 
+    var soundOn = true;
+    var speakerIcon;
+
     var exitTo = function(s) {
         switchState(s);
         menu.disable();
+
+        // Hide speaker icon after starting game
+        if (speakerIcon) {
+            speakerIcon.style.display = 'none';
+        }
     };
 
-    var menu = new Menu("CHOOSE A GAME",2*tileSize,0*tileSize,mapWidth-4*tileSize,3*tileSize,tileSize,tileSize+"px ArcadeR", "#EEE");
+    var menu = new Menu("WELCOME!",2*tileSize,0*tileSize,mapWidth-4*tileSize,3*tileSize,tileSize,tileSize+"px ArcadeR", "#EEE");
     var getIconAnimFrame = function(frame) {
         frame = Math.floor(frame/3)+1;
         frame %= 4;
@@ -9599,49 +9614,22 @@ var homeState = (function(){
         }
         return frame;
     };
-    var getOttoAnimFrame = function(frame) {
-        frame = Math.floor(frame/3);
-        frame %= 4;
-        return frame;
-    };
+    
     menu.addTextIconButton(getGameName(GAME_PACMAN),
         function() {
             gameMode = GAME_PACMAN;
-            exitTo(preNewGameState);
+            exitTo(newGameState);
         },
         function(ctx,x,y,frame) {
             atlas.drawPacmanSprite(ctx,x,y,DIR_RIGHT,getIconAnimFrame(frame));
         });
-    menu.addTextIconButton(getGameName(GAME_MSPACMAN),
-        function() {
-            gameMode = GAME_MSPACMAN;
-            exitTo(preNewGameState);
-        },
-        function(ctx,x,y,frame) {
-            atlas.drawMsPacmanSprite(ctx,x,y,DIR_RIGHT,getIconAnimFrame(frame));
-        });
-    menu.addTextIconButton(getGameName(GAME_COOKIE),
-        function() {
-            gameMode = GAME_COOKIE;
-            exitTo(preNewGameState);
-        },
-        function(ctx,x,y,frame) {
-            drawCookiemanSprite(ctx,x,y,DIR_RIGHT,getIconAnimFrame(frame), true);
-        });
-
-    menu.addSpacer(0.5);
-    menu.addTextIconButton("LEARN",
-        function() {
-            exitTo(learnState);
-        },
-        function(ctx,x,y,frame) {
-            atlas.drawGhostSprite(ctx,x,y,Math.floor(frame/8)%2,DIR_RIGHT,false,false,false,blinky.color);
-        });
-
+    
     return {
         init: function() {
             menu.enable();
             audio.coffeeBreakMusic.startLoop();
+            
+            
         },
         draw: function() {
             renderer.clearMapFrame();
@@ -10991,73 +10979,73 @@ var seekableScriptState = newChildObject(scriptState, {
 // Dead state
 // (state when player has lost a life)
 
-var deadState = (function() {
-    
-    // this state will always have these drawn
-    var commonDraw = function() {
-        renderer.blitMap();
-        renderer.drawScore();
-    };
+    var deadState = (function() {
+        
+        // this state will always have these drawn
+        var commonDraw = function() {
+            renderer.blitMap();
+            renderer.drawScore();
+        };
 
-    return newChildObject(seekableScriptState, {
+        return newChildObject(seekableScriptState, {
 
-        // script functions for each time
-        triggers: {
-            0: { // freeze
-                init: function() {
-                    audio.die.play();
+            // script functions for each time
+            triggers: {
+                0: { // freeze
+                    init: function() {
+                        audio.die.play();
+                    },
+                    update: function() {
+                        var i;
+                        for (i=0; i<4; i++) 
+                            actors[i].frames++; // keep animating ghosts
+                    },
+                    draw: function() {
+                        commonDraw();
+                        renderer.beginMapClip();
+                        renderer.drawFruit();
+                        renderer.drawActors();
+                        renderer.endMapClip();
+                    }
                 },
-                update: function() {
-                    var i;
-                    for (i=0; i<4; i++) 
-                        actors[i].frames++; // keep animating ghosts
+                60: {
+                    draw: function() { // isolate pacman
+                        commonDraw();
+                        renderer.beginMapClip();
+                        renderer.drawPlayer();
+                        renderer.endMapClip();
+                    },
                 },
-                draw: function() {
-                    commonDraw();
-                    renderer.beginMapClip();
-                    renderer.drawFruit();
-                    renderer.drawActors();
-                    renderer.endMapClip();
-                }
+                120: {
+                    draw: function(t) { // dying animation
+                        commonDraw();
+                        renderer.beginMapClip();
+                        renderer.drawDyingPlayer(t/75);
+                        renderer.endMapClip();
+                    },
+                },
+                195: {
+                    draw: function() {
+                        commonDraw();
+                        renderer.beginMapClip();
+                        renderer.drawDyingPlayer(1);
+                        renderer.endMapClip();
+                    },
+                },
+                240: {
+                    draw: function() {
+                        commonDraw();
+                        renderer.beginMapClip();
+                        renderer.drawDyingPlayer(1);
+                        renderer.endMapClip();
+                    },
+                    init: function() { // leave
+                        switchState( extraLives == 0 ? overState : readyRestartState);
+                    }
+                },
             },
-            60: {
-                draw: function() { // isolate pacman
-                    commonDraw();
-                    renderer.beginMapClip();
-                    renderer.drawPlayer();
-                    renderer.endMapClip();
-                },
-            },
-            120: {
-                draw: function(t) { // dying animation
-                    commonDraw();
-                    renderer.beginMapClip();
-                    renderer.drawDyingPlayer(t/75);
-                    renderer.endMapClip();
-                },
-            },
-            195: {
-                draw: function() {
-                    commonDraw();
-                    renderer.beginMapClip();
-                    renderer.drawDyingPlayer(1);
-                    renderer.endMapClip();
-                },
-            },
-            240: {
-                draw: function() {
-                    commonDraw();
-                    renderer.beginMapClip();
-                    renderer.drawDyingPlayer(1);
-                    renderer.endMapClip();
-                },
-                init: function() { // leave
-                    switchState( extraLives == 0 ? overState : readyRestartState);
-                }
-            },
-        },
-    });
-})();
+        });
+    })();
 
 ////////////////////////////////////////////////////
 // Finish state
@@ -11114,6 +11102,87 @@ var finishState = (function(){
     });
 })();
 
+function watchAd() {
+    document.getElementById("gameOverModal").style.display = "none";
+    reviveFromDeath();
+}
+function buyWithPi() {
+    document.getElementById("gameOverModal").style.display = "none";
+
+    if (typeof window.Pi === "undefined") {
+        alert("Pi SDK not loaded.");
+        return;
+    }
+
+    const paymentData = {
+        amount: 0.1, // amount in Pi
+        memo: "Revive in Pac-Man game", // shown to user
+        metadata: {
+            action: "revive",
+            timestamp: Date.now()
+        }
+    };
+
+    window.Pi.createPayment(paymentData)
+        .then(payment => {
+            // Optional: notify server if you're verifying payment server-side
+            console.log("Payment successful!", payment);
+            reviveFromDeath(); // let user continue the game
+        })
+        .catch(error => {
+            console.error("Payment failed or canceled:", error);
+            goHome(); // fallback
+        });
+}
+
+
+function goHome() {
+    document.getElementById("gameOverModal").style.display = "none";
+    switchState(homeState, 60);
+}
+
+
+function createGameOverModal() {
+    if (document.getElementById("gameOverModal")) return; // prevent duplicates
+
+    const modal = document.createElement("div");
+    modal.id = "gameOverModal";
+    Object.assign(modal.style, {
+        display: "none",
+        position: "absolute",
+        top: "30%",
+        left: "50%",
+        transform: "translate(-50%, -30%)",
+        background: "#000", // black background
+        color: "#EEE",      // matching menu color
+        padding: "16px",
+        borderRadius: "4px",
+        textAlign: "center",
+        zIndex: "999",
+        font: `${tileSize}px ArcadeR, monospace`, // same font
+        textTransform: "uppercase",
+        letterSpacing: "2px",
+        boxShadow: "0 0 10px #EEE"
+    });
+
+    modal.innerHTML = `
+        <h2 style="margin:0 0 10px;">Game Over</h2>
+        <div id="flex-box">
+        <h3 style="margin:0 0 10px;">Revive?</h3>
+        <button id="watchAdBtn" class="game-btn">Watch Ad</button>
+        <button id="buyPiBtn" class="game-btn">Buy with Pi</button>
+        <br>
+        <button id="homeBtn" class="game-btn">Home</button>
+        </div>
+    `;
+
+    document.body.appendChild(modal);
+
+    document.getElementById("watchAdBtn").onclick = watchAd;
+    document.getElementById("buyPiBtn").onclick = buyWithPi;
+    document.getElementById("homeBtn").onclick = goHome;
+}
+
 ////////////////////////////////////////////////////
 // Game Over state
 // (state when player has lost last life)
@@ -11123,6 +11192,7 @@ var overState = (function() {
     return {
         init: function() {
             frames = 0;
+            createGameOverModal();
         },
         draw: function() {
             renderer.blitMap();
@@ -11131,13 +11201,45 @@ var overState = (function() {
         },
         update: function() {
             if (frames == 120) {
-                switchState(homeState,60);
+                document.getElementById("gameOverModal").style.display = "block";
             }
             else
                 frames++;
         },
     };
 })();
+function reviveFromDeath() {
+    extraLives += 3
+    
+    // Don't touch score
+
+    // Reset internal frame counters, states
+    ghostReleaser.reset?.();
+    ghostCommander.reset?.();
+    elroyTimer.reset?.();
+    fruit.reset?.();
+    energizer.reset?.();
+
+    // Reset Pac-Man
+    pacman.reset();
+    pacman.dead = false;
+
+    // Reset ghosts
+    for (let i = 0; i < ghosts.length; i++) {
+        ghosts[i].reset();
+    }
+
+    // Reset VCR recording/replay (if needed)
+    if (typeof vcr !== "undefined") {
+        vcr.reset();
+    }
+
+
+    // Switch to READY screen like newGameState does
+    switchState(readyRestartState); // This shows "READY!" and transitions to playState
+}
+
+
 
 //@line 1 "src/input.js"
 //////////////////////////////////////////////////////////////////////////////////////
@@ -11408,11 +11510,11 @@ var initSwipe = function() {
     };
     
     // register touch events
-    document.onclick = touchTap;
-    document.ontouchstart = touchStart;
-    document.ontouchend = touchEnd;
-    document.ontouchmove = touchMove;
-    document.ontouchcancel = touchCancel;
+    document.addEventListener("touchstart", touchStart, { passive: false });
+    document.addEventListener("touchmove", touchMove, { passive: false });
+    document.addEventListener("touchend", touchEnd, { passive: false });
+    document.addEventListener("touchcancel", touchCancel, { passive: false });
+
 };
 //@line 1 "src/cutscenes.js"
 ////////////////////////////////////////////////

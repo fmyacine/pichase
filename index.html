@@ -21,6 +21,21 @@
 
     <link rel="icon" type="image/png" href="icon/favicon.png"/>
 
+    <script src="https://sdk.minepi.com/pi-sdk.js"></script>
+    <script>Pi.init({ version: "2.0" })
+        window.Pi.authenticate(["username", "payments"],
+  function(user) {
+    console.log("✅ Pi user authenticated:", user.username);
+    // You can store user.username for reference
+  },
+  function(error) {
+    console.error("❌ Pi authentication failed:", error);
+  }
+);
+
+
+    </script>
+    
     <style>
         body {
             margin:0;
@@ -37,7 +52,34 @@
             color: #FF0;
             font-size: 1.5em;
         }
-    </style>
+@font-face {
+    font-family: 'ArcadeR';
+    src: url('fonts/ArcadeR.ttf') format('truetype'); /* adjust path if needed */
+}
+
+#flex-box{
+    display: flex;
+    flex-direction: column;
+}
+.game-btn {
+    font-family: 'ArcadeR', monospace;
+    font-size: 16px;
+    color: #6e6e6e;
+    background-color: #000;
+    border: 2px solid #6e6e6e;
+    padding: 8px 20px;
+    margin: 6px;
+    cursor: pointer;
+    text-transform: uppercase;
+    letter-spacing: 2px;
+}
+
+.game-btn:hover {
+    border-color: white;
+    color: white;
+}
+</style>
+
 
 <script src="pacman.js"></script>
 
